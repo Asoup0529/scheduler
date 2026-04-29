@@ -126,10 +126,42 @@
       if (employees.length === 0) { box.innerHTML = '<p class="small">尚未新增員工。</p>'; return; }
       box.innerHTML = employees.map((emp, i) => `
         <div class="employee-item">
-          <strong>${emp.name}</strong><span class="tag ${emp.type}">${emp.type === 'fulltime' ? '正職' : '工讀'}</span>
-          <p>想休：${emp.offText || '無'}</p>
+          <label>姓名</label>
+          <input type="text" id="editName${i}" value="${emp.name}" />
+
+          <label>員工類型</label>
+          <select id="editType${i}">
+            <option value="fulltime" ${emp.type === 'fulltime' ? 'selected' : ''}>正職</option>
+            <option value="parttime" ${emp.type === 'parttime' ? 'selected' : ''}>工讀</option>
+          </select>
+
+          <label>想休日期</label>
+          <input type="text" id="editOff${i}" value="${emp.offText || ''}" placeholder="例如：1, 5, 12" />
+
+          <button class="secondary" onclick="updateEmployee(${i})">儲存修改</button>
           <button class="danger" onclick="removeEmployee(${i})">刪除</button>
         </div>`).join('');
+    }
+
+    function updateEmployee(index) {
+      const name = document.getElementById(`editName${index}`).value.trim();
+      const type = document.getElementById(`editType${index}`).value;
+      const offText = document.getElementById(`editOff${index}`).value.trim();
+
+      if (!name) {
+        alert('員工姓名不能空白');
+        return;
+      }
+
+      employees[index] = {
+        ...employees[index],
+        name,
+        type,
+        offText
+      };
+
+      renderEmployees();
+      alert('員工資料已更新');
     }
 
     function isHoliday(date, nationalHolidayDays) {
