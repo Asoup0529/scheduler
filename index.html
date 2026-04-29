@@ -219,10 +219,14 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month - 1, d);
         const holiday = isHoliday(date, nationalHolidayDays);
-        const isTuesday = date.getDay() === 2;
-        const minPeople = isTuesday ? 2 : (holiday ? holidayNeed : weekdayMinNeed);
-        const maxPeople = isTuesday ? 2 : (holiday ? holidayNeed : weekdayMaxNeed);
-        const needPeople = maxPeople;
+        const dow = date.getDay(); // 0日 1一 2二 3三 4四 5五 6六
+        let needPeople;
+        if (dow === 1) needPeople = 4; // 週一
+        else if (dow === 2) needPeople = 2; // 週二
+        else if (dow >= 3 && dow <= 5) needPeople = 3; // 週三到週五
+        else needPeople = 5; // 週末/假日
+        const minPeople = needPeople;
+        const maxPeople = needPeople;
 
         latestSchedule.push({
           day: d,
@@ -379,8 +383,8 @@
 
       document.getElementById('scheduleTable').innerHTML = `
         <table>
-          <tr><th>日期</th><th>星期</th><th>類型</th><th>人數規則</th><th>上班人員</th><th>休假人員</th></tr>
-          ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.minPeople === row.maxPeople ? row.minPeople + ' 人' : row.minPeople + '-' + row.maxPeople + ' 人'}</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
+          <tr><th>日期</th><th>星期</th><th>人數</th><th>上班人員</th><th>休假人員</th></tr>
+          ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.needPeople} 人</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
         </table>
       `;
     }
