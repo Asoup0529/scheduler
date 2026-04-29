@@ -45,8 +45,7 @@
         <div><label>選擇月份</label><input type="month" id="monthInput" /></div>
         <div><label>平日最少上班人數</label><input type="number" id="weekdayMinNeed" value="3" min="1" /></div>
         <div><label>平日最多上班人數</label><input type="number" id="weekdayMaxNeed" value="4" min="1" /></div>
-        <div><label>假日固定上班人數</label><input type="number" id="holidayNeed" value="5" min="1" /></div>" /></div>
-        <div><label>假日固定上班人數</label><input type="number" id="holidayNeed" value="5" min="1" /></div>
+        
         <div><label>正職每月休假天數</label><input type="number" id="fulltimeOffDays" value="8" min="0" /></div>
       </div>
       <label>國定假日日期</label>
@@ -78,7 +77,7 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日一定要 5 人。假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
+      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
@@ -186,11 +185,13 @@
 
       const monthValue = document.getElementById('monthInput').value;
       const ym = monthValue.split('-').map(Number);
-      consear, month, 0).getDate();
+      const year = ym[0];
+      const month = ym[1];
+      const daysInMonth = new Date(year, month, 0).getDate();
       const weekdayMinNeed = parseInt(document.getElementById('weekdayMinNeed').value, 10);
       const weekdayMaxNeed = parseInt(document.getElementById('weekdayMaxNeed').value, 10);
       if (weekdayMinNeed > weekdayMaxNeed) { alert('平日最少人數不能大於最多人數'); return; }
-      const holidayNeed = parseInt(document.getElementById('holidayNeed').value, 10);
+      const holidayNeed = 5;
       const fulltimeOffDays = parseInt(document.getElementById('fulltimeOffDays').value, 10);
       const nationalHolidayDays = parseDays(document.getElementById('nationalHolidays').value, year, month);
 
@@ -218,7 +219,8 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month - 1, d);
         const holiday = isHoliday(date, nationalHolidayDays);
-        const isTuesdayy ? holidayNeed : weekdayMinNeed);
+        const isTuesday = date.getDay() === 2;
+        const minPeople = isTuesday ? 2 : (holiday ? holidayNeed : weekdayMinNeed);
         const maxPeople = isTuesday ? 2 : (holiday ? holidayNeed : weekdayMaxNeed);
         const needPeople = maxPeople;
 
@@ -228,7 +230,8 @@
           holiday,
           needPeople,
           minPeople,
-        ,
+          maxPeople,
+          assigned: [],
           off: staff.filter(e => e.offDays.includes(d)).map(e => e.name)
         });
       }
@@ -251,7 +254,7 @@
           return a.workDays - b.workDays;
         });
 
-       ;
+        const remainingNeed = row.needPeople - row.assigned.length;
         const assignedFulltimers = availableFulltimers.slice(0, remainingNeed);
 
         assignedFulltimers.forEach(emp => {
@@ -308,7 +311,12 @@
         });
 
         if (row.assigned.length < row.minPeople) {
-          warnip.workDays < 4) {
+          warnings.push(month + '/' + d + ' 人數不足，最少需要 ' + row.minPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
+        }
+      }
+
+      parttimers.forEach(emp => {
+        if (emp.workDays < 4) {
           warnings.push('工讀 ' + emp.name + ' 本月只排 ' + emp.workDays + ' 天，少於 4 天。');
         }
       });
@@ -329,39 +337,41 @@
       document.getElementById('scheduleTable').innerHTML = `
         <table>
           <tr><th>日期</th><th>星期</th><th>類型</th><th>人數規則</th><th>上班人員</th><th>休假人員</th></tr>
-          ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.minPeople === row.maxPeople ? row.minPeopin('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
+          ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.minPeople === row.maxPeople ? row.minPeople + ' 人' : row.minPeople + '-' + row.maxPeople + ' 人'}</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
         </table>
       `;
     }
 
     function saveData() {
       localStorage.setItem('shiftEmployees', JSON.stringify(employees));
-      localStorage.setItem('shiftMonth', documeput').value);
+      localStorage.setItem('shiftMonth', document.getElementById('monthInput').value);
       localStorage.setItem('nationalHolidays', document.getElementById('nationalHolidays').value);
       localStorage.setItem('weekdayMinNeed', document.getElementById('weekdayMinNeed').value);
       localStorage.setItem('weekdayMaxNeed', document.getElementById('weekdayMaxNeed').value);
-      localStorage.setItem('holidayNeed', document.getElementById('holidayNeed').value);
-      localStorage.setItem('fulltimeOffDays', document.getElementById('fulltimeOffDays').value);
+            localStorage.setItem('fulltimeOffDays', document.getElementById('fulltimeOffDays').value);
       alert('已儲存到這台電腦的瀏覽器');
     }
 
-    fyees') || '[]');
+    function loadData() {
+      employees = JSON.parse(localStorage.getItem('shiftEmployees') || '[]');
       document.getElementById('monthInput').value = localStorage.getItem('shiftMonth') || document.getElementById('monthInput').value;
       document.getElementById('nationalHolidays').value = localStorage.getItem('nationalHolidays') || '';
       document.getElementById('weekdayMinNeed').value = localStorage.getItem('weekdayMinNeed') || '3';
       document.getElementById('weekdayMaxNeed').value = localStorage.getItem('weekdayMaxNeed') || '4';
-      document.getElementById('holidayNeed').value = localStorage.getItem('holidayNeed') || '5';
-      document.getElementById('fulltimeOffDays').value = localStorage.getItem('fulltimeOffDays') || '8';
+            document.getElementById('fulltimeOffDays').value = localStorage.getItem('fulltimeOffDays') || '8';
       renderEmployees();
     }
 
     function clearAll() {
-      if (!confirm('確定要清空所有員工資料嗎？('shiftEmployees');
+      if (!confirm('確定要清空所有員工資料嗎？')) return;
+      employees = [];
+      latestSchedule = [];
+      localStorage.removeItem('shiftEmployees');
       localStorage.removeItem('shiftMonth');
       localStorage.removeItem('nationalHolidays');
       localStorage.removeItem('weekdayMinNeed');
       localStorage.removeItem('weekdayMaxNeed');
-      localStorage.removeItem('holidayNeed');
+      
       localStorage.removeItem('fulltimeOffDays');
       renderEmployees();
       document.getElementById('summary').innerHTML = '';
@@ -372,7 +382,7 @@
       if (!latestSchedule.length) { alert('請先產生班表'); return; }
       let lines = ['日期,星期,類型,需求人數,上班人員,休假人員'];
       latestSchedule.forEach(row => {
-        lines.push(row.day + ',星期' + row.weekday + ',' + (row.holile + ',"' + row.assigned.join('、') + '","' + row.off.join('、') + '"');
+        lines.push(row.day + ',星期' + row.weekday + ',' + (row.holiday ? '假日' : '平日') + ',' + row.needPeople + ',"' + row.assigned.join('、') + '","' + row.off.join('、') + '"');
       });
       const blob = new Blob([String.fromCharCode(65279) + lines.join(String.fromCharCode(10))], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
