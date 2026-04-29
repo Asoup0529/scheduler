@@ -239,6 +239,9 @@
         });
 
         availableFulltimers.sort((a, b) => {
+          const offCountA = fulltimers.filter(e => e.offDays.includes(d)).length;
+          const offCountB = offCountA;
+          if (offCountA !== offCountB) return offCountB - offCountA;
           if (a.consecutive >= 5 && b.consecutive < 5) return 1;
           if (b.consecutive >= 5 && a.consecutive < 5) return -1;
           return a.workDays - b.workDays;
@@ -287,6 +290,7 @@
 
         let availableParttimers = parttimers.filter(emp => !emp.offDays.includes(d));
         availableParttimers.sort((a, b) => {
+          const offCount = staff.filter(e => e.offDays.includes(d)).length;
           if (a.workDays < 4 && b.workDays >= 4) return -1;
           if (b.workDays < 4 && a.workDays >= 4) return 1;
           return a.workDays - b.workDays;
