@@ -29,23 +29,33 @@
     .small { font-size: 13px; color: #555; }
     .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
     .warning { color: #b91c1c; font-weight: bold; }
-    @media print { header, .input-area, .actions, .no-print { display: none; } body { background: white; } main { max-width: none; margin: 0; } .card { box-shadow: none; border: none; } }
+    @media print {
+      header, .input-area, .actions, .no-print { display: none; }
+      body { background: white; }
+      main { max-width: none; margin: 0; }
+      .card { box-shadow: none; border: none; }
+    }
   </style>
 </head>
 <body>
   <header>
     <h1>排班系統</h1>
-    <p>輸入員工、身分與休假日期，自動產生每月班表</p>
   </header>
 
   <main>
     <section class="card input-area">
-      <h2>1. 設定月份與人數規則</h2>
+      <h2>1. 設定月份</h2>
       <div class="grid">
-        <div><label>選擇月份</label><input type="month" id="monthInput" /></div>
+        <div>
+          <label>選擇月份</label>
+          <input type="month" id="monthInput" />
         </div>
-        <div><label>正職每月休假天數</label><input type="number" id="fulltimeOffDays" value="8" min="0" /></div>
+        <div>
+          <label>正職每月休假天數</label>
+          <input type="number" id="fulltimeOffDays" value="8" min="0" />
+        </div>
       </div>
+
       <label>國定假日日期</label>
       <textarea id="nationalHolidays" placeholder="例如：1,10,25 或 2026-05-01,2026-05-25。週六日會自動視為假日。"></textarea>
       <p class="small">可輸入：1,5,10-15。國定假日也支援完整日期，例如 2026-05-01。</p>
@@ -54,9 +64,21 @@
     <section class="card input-area">
       <h2>2. 新增員工</h2>
       <div class="grid">
-        <div><label>員工姓名</label><input type="text" id="empName" placeholder="例如：小明" /></div>
-        <div><label>員工類型</label><select id="empType"><option value="fulltime">正職</option><option value="parttime">工讀</option></select></div>
-        <div><label>想休日期</label><input type="text" id="empOff" placeholder="例如：1,5,10-15,21-25" /></div>
+        <div>
+          <label>員工姓名</label>
+          <input type="text" id="empName" placeholder="例如：小明" />
+        </div>
+        <div>
+          <label>員工類型</label>
+          <select id="empType">
+            <option value="fulltime">正職</option>
+            <option value="parttime">工讀</option>
+          </select>
+        </div>
+        <div>
+          <label>想休日期</label>
+          <input type="text" id="empOff" placeholder="例如：1,5,10-15,21-25" />
+        </div>
       </div>
       <button onclick="addEmployee()">新增員工</button>
       <p class="small">日期可輸入單日、多日或範圍，例如：1,5,21-25。</p>
@@ -75,7 +97,6 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note" style="display:none"></div>
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
@@ -91,6 +112,15 @@
 
     const today = new Date();
     document.getElementById('monthInput').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
 
     function isNumberText(value) {
       return value !== '' && !isNaN(Number(value));
@@ -126,9 +156,14 @@
     function addEmployee() {
       const name = document.getElementById('empName').value.trim();
       const type = document.getElementById('empType').value;
-      const offDays = document.getElementById('empOff').value.trim();
-      if (!name) { alert('請輸入員工姓名'); return; }
-      employees.push({ name, type, offText: offDays });
+      const offText = document.getElementById('empOff').value.trim();
+
+      if (!name) {
+        alert('請輸入員工姓名');
+        return;
+      }
+
+      employees.push({ name, type, offText });
       document.getElementById('empName').value = '';
       document.getElementById('empOff').value = '';
       renderEmployees();
@@ -143,7 +178,12 @@
       const name = document.getElementById('editName' + index).value.trim();
       const type = document.getElementById('editType' + index).value;
       const offText = document.getElementById('editOff' + index).value.trim();
-      if (!name) { alert('員工姓名不能空白'); return; }
+
+      if (!name) {
+        alert('員工姓名不能空白');
+        return;
+      }
+
       employees[index] = { name, type, offText };
       renderEmployees();
       alert('員工資料已更新');
@@ -151,6 +191,7 @@
 
     function renderEmployees() {
       const box = document.getElementById('employeeList');
+
       if (employees.length === 0) {
         box.innerHTML = '<p class="small">尚未新增員工。</p>';
         return;
@@ -159,14 +200,17 @@
       box.innerHTML = employees.map((emp, i) => `
         <div class="employee-item">
           <label>姓名</label>
-          <input type="text" id="editName${i}" value="${emp.name}" />
+          <input type="text" id="editName${i}" value="${escapeHtml(emp.name)}" />
+
           <label>員工類型</label>
           <select id="editType${i}">
             <option value="fulltime" ${emp.type === 'fulltime' ? 'selected' : ''}>正職</option>
             <option value="parttime" ${emp.type === 'parttime' ? 'selected' : ''}>工讀</option>
           </select>
+
           <label>想休日期</label>
-          <input type="text" id="editOff${i}" value="${emp.offText || ''}" placeholder="例如：1,5,21-25" />
+          <input type="text" id="editOff${i}" value="${escapeHtml(emp.offText || '')}" placeholder="例如：1,5,21-25" />
+
           <button class="secondary" onclick="updateEmployee(${i})">儲存修改</button>
           <button class="danger" onclick="removeEmployee(${i})">刪除</button>
         </div>
@@ -178,15 +222,26 @@
       return day === 0 || day === 6 || nationalHolidayDays.includes(date.getDate());
     }
 
+    function getNeedPeople(date, holiday) {
+      const dow = date.getDay();
+      if (holiday) return 5;
+      if (dow === 1) return 4;
+      if (dow === 2) return 2;
+      if (dow >= 3 && dow <= 5) return 3;
+      return 5;
+    }
+
     function generateSchedule() {
-      if (employees.length === 0) { alert('請先新增員工'); return; }
+      if (employees.length === 0) {
+        alert('請先新增員工');
+        return;
+      }
 
       const monthValue = document.getElementById('monthInput').value;
       const ym = monthValue.split('-').map(Number);
       const year = ym[0];
       const month = ym[1];
       const daysInMonth = new Date(year, month, 0).getDate();
-      
       const holidayNeed = 5;
       const fulltimeOffDays = parseInt(document.getElementById('fulltimeOffDays').value, 10);
       const nationalHolidayDays = parseDays(document.getElementById('nationalHolidays').value, year, month);
@@ -215,28 +270,21 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month - 1, d);
         const holiday = isHoliday(date, nationalHolidayDays);
-        const dow = date.getDay(); // 0日 1一 2二 3三 4四 5五 6六
-        let needPeople;
-        if (dow === 1) needPeople = 4; // 週一
-        else if (dow === 2) needPeople = 2; // 週二
-        else if (dow >= 3 && dow <= 5) needPeople = 3; // 週三到週五
-        else needPeople = 5; // 週末/假日
-        const minPeople = needPeople;
-        const maxPeople = needPeople;
+        const needPeople = getNeedPeople(date, holiday);
 
         latestSchedule.push({
           day: d,
           weekday: ['日','一','二','三','四','五','六'][date.getDay()],
           holiday,
           needPeople,
-          minPeople,
-          maxPeople,
+          minPeople: needPeople,
+          maxPeople: needPeople,
           assigned: [],
           off: staff.filter(e => e.offDays.includes(d)).map(e => e.name)
         });
       }
 
-      // 第一階段：先排正職，每個正職必須剛好上 daysInMonth - fulltimeOffDays 天
+      // 第一階段：先排正職，正職要盡量剛好休設定天數
       for (let d = 1; d <= daysInMonth; d++) {
         const row = latestSchedule[d - 1];
         let availableFulltimers = fulltimers.filter(emp => {
@@ -246,13 +294,9 @@
         });
 
         availableFulltimers.sort((a, b) => {
-          const offCountA = fulltimers.filter(e => e.offDays.includes(d)).length;
-          const offCountB = offCountA;
-          if (offCountA !== offCountB) return offCountB - offCountA;
           if (a.consecutive >= 5 && b.consecutive < 5) return 1;
           if (b.consecutive >= 5 && a.consecutive < 5) return -1;
-          if (a.offDays && b.offDays && a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
-            return a.workDays - b.workDays;ays.length) return b.offDays.length - a.offDays.length;
+          if (a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
           return a.workDays - b.workDays;
         });
 
@@ -271,6 +315,7 @@
         });
       }
 
+      // 第二階段：正職若還沒達到應上班天數，從未滿人的日期補上
       fulltimers.forEach(emp => {
         if (emp.workDays < targetFulltimeWorkDays) {
           for (let d = 1; d <= daysInMonth && emp.workDays < targetFulltimeWorkDays; d++) {
@@ -284,14 +329,7 @@
         }
       });
 
-      fulltimers.forEach(emp => {
-        const actualOff = daysInMonth - emp.workDays;
-        if (actualOff !== fulltimeOffDays) {
-          warnings.push('正職 ' + emp.name + ' 本月休 ' + actualOff + ' 天，未剛好符合設定的 ' + fulltimeOffDays + ' 天。');
-        }
-      });
-
-      // 第二階段：正職排完後，再用工讀補足每天人數
+      // 第三階段：正職排完後，再用工讀補足每天人數
       for (let d = 1; d <= daysInMonth; d++) {
         const row = latestSchedule[d - 1];
         const needToFill = row.needPeople - row.assigned.length;
@@ -299,11 +337,9 @@
 
         let availableParttimers = parttimers.filter(emp => !emp.offDays.includes(d));
         availableParttimers.sort((a, b) => {
-          const offCount = staff.filter(e => e.offDays.includes(d)).length;
           if (a.workDays < 4 && b.workDays >= 4) return -1;
           if (b.workDays < 4 && a.workDays >= 4) return 1;
-          if (a.offDays && b.offDays && a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
-            return a.workDays - b.workDays;ays.length) return b.offDays.length - a.offDays.length;
+          if (a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
           return a.workDays - b.workDays;
         });
 
@@ -313,21 +349,17 @@
           emp.assignedDays.push(d);
           row.assigned.push(emp.name);
         });
-
-        if (row.assigned.length < row.minPeople) {
-          warnings.push(month + '/' + d + ' 人數不足，最少需要 ' + row.minPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
-        }
       }
 
-      // 第三階段：假日若不足 5 人，從已排滿 4 人的平日移人過去補
+      // 第四階段：假日不足 5 人時，從已排滿 4 人的週一移人去補，不違反原日人數下限
       latestSchedule.forEach(holidayRow => {
         if (!holidayRow.holiday) return;
 
-        while (holidayRow.assigned.length < holidayRow.needPeople) {
+        while (holidayRow.assigned.length < holidayNeed) {
           let moved = false;
 
           const sourceDays = latestSchedule.filter(row => {
-            return !row.holiday && row.maxPeople === 4 && row.assigned.length === 4 && row.assigned.length > row.minPeople;
+            return !row.holiday && row.needPeople === 4 && row.assigned.length === 4;
           });
 
           for (const sourceRow of sourceDays) {
@@ -346,7 +378,7 @@
               emp.assignedDays = emp.assignedDays.filter(day => day !== sourceRow.day);
               emp.assignedDays.push(holidayRow.day);
               emp.assignedDays.sort((a, b) => a - b);
-              warnings.push(month + '/' + holidayRow.day + ' 假日人數不足，已從 ' + month + '/' + sourceRow.day + ' 平日移動 ' + candidateName + ' 補班。');
+              warnings.push(month + '/' + holidayRow.day + ' 假日人數不足，已從 ' + month + '/' + sourceRow.day + ' 移動 ' + candidateName + ' 補班。');
               moved = true;
               break;
             }
@@ -356,9 +388,17 @@
         }
       });
 
+      // 第五階段：最後檢查
       latestSchedule.forEach(row => {
-        if (row.assigned.length < row.minPeople) {
-          warnings.push(month + '/' + row.day + ' 人數不足，最少需要 ' + row.minPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
+        if (row.assigned.length < row.needPeople) {
+          warnings.push(month + '/' + row.day + ' 人數不足，需要 ' + row.needPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
+        }
+      });
+
+      fulltimers.forEach(emp => {
+        const actualOff = daysInMonth - emp.workDays;
+        if (actualOff !== fulltimeOffDays) {
+          warnings.push('正職 ' + emp.name + ' 本月休 ' + actualOff + ' 天，未剛好符合設定的 ' + fulltimeOffDays + ' 天。');
         }
       });
 
@@ -375,16 +415,48 @@
       document.getElementById('summary').innerHTML = `
         <h3>${year} 年 ${month} 月員工統計</h3>
         <table>
-          <tr><th>姓名</th><th>類型</th><th>上班天數</th><th>上班日期</th><th>休假天數</th><th>指定休假</th></tr>
-          ${staff.map(emp => `<tr><td>${emp.name}</td><td>${emp.type === 'fulltime' ? '正職' : '工讀'}</td><td>${emp.workDays}</td><td>${emp.assignedDays.length ? emp.assignedDays.join('、') : '無'}</td><td>${latestSchedule.length - emp.workDays}</td><td>${emp.offText || '無'}</td></tr>`).join('')}
+          <tr>
+            <th>姓名</th>
+            <th>類型</th>
+            <th>上班天數</th>
+            <th>上班日期</th>
+            <th>休假天數</th>
+            <th>指定休假</th>
+          </tr>
+          ${staff.map(emp => `
+            <tr>
+              <td>${escapeHtml(emp.name)}</td>
+              <td>${emp.type === 'fulltime' ? '正職' : '工讀'}</td>
+              <td>${emp.workDays}</td>
+              <td>${emp.assignedDays.length ? emp.assignedDays.join('、') : '無'}</td>
+              <td>${latestSchedule.length - emp.workDays}</td>
+              <td>${escapeHtml(emp.offText || '無')}</td>
+            </tr>
+          `).join('')}
         </table>
-        ${warnings.length ? `<div class="note warning"><strong>提醒：</strong><br>${warnings.join('<br>')}</div>` : '<div class="note" style="display:none"></div>'}
+        ${warnings.length ? `<div class="note warning"><strong>提醒：</strong><br>${warnings.map(escapeHtml).join('<br>')}</div>` : '<div class="note">排班完成，目前沒有明顯衝突。</div>'}
       `;
 
       document.getElementById('scheduleTable').innerHTML = `
         <table>
-          <tr><th>日期</th><th>星期</th><th>類型</th><th>需要員工數</th><th>上班人員</th><th>休假人員</th></tr>
-          ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.needPeople} 人</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
+          <tr>
+            <th>日期</th>
+            <th>星期</th>
+            <th>類型</th>
+            <th>需要員工數</th>
+            <th>上班人員</th>
+            <th>休假人員</th>
+          </tr>
+          ${latestSchedule.map(row => `
+            <tr class="${row.holiday ? 'holiday' : ''}">
+              <td>${month}/${row.day}</td>
+              <td>${row.weekday}</td>
+              <td>${row.holiday ? '假日' : '平日'}</td>
+              <td>${row.needPeople} 人</td>
+              <td>${row.assigned.map(escapeHtml).join('、') || '無'}</td>
+              <td>${row.off.map(escapeHtml).join('、') || '無'}</td>
+            </tr>
+          `).join('')}
         </table>
       `;
     }
@@ -393,8 +465,7 @@
       localStorage.setItem('shiftEmployees', JSON.stringify(employees));
       localStorage.setItem('shiftMonth', document.getElementById('monthInput').value);
       localStorage.setItem('nationalHolidays', document.getElementById('nationalHolidays').value);
-      
-            localStorage.setItem('fulltimeOffDays', document.getElementById('fulltimeOffDays').value);
+      localStorage.setItem('fulltimeOffDays', document.getElementById('fulltimeOffDays').value);
       alert('已儲存到這台電腦的瀏覽器');
     }
 
@@ -402,8 +473,7 @@
       employees = JSON.parse(localStorage.getItem('shiftEmployees') || '[]');
       document.getElementById('monthInput').value = localStorage.getItem('shiftMonth') || document.getElementById('monthInput').value;
       document.getElementById('nationalHolidays').value = localStorage.getItem('nationalHolidays') || '';
-      
-            document.getElementById('fulltimeOffDays').value = localStorage.getItem('fulltimeOffDays') || '8';
+      document.getElementById('fulltimeOffDays').value = localStorage.getItem('fulltimeOffDays') || '8';
       renderEmployees();
     }
 
@@ -414,8 +484,6 @@
       localStorage.removeItem('shiftEmployees');
       localStorage.removeItem('shiftMonth');
       localStorage.removeItem('nationalHolidays');
-      
-      
       localStorage.removeItem('fulltimeOffDays');
       renderEmployees();
       document.getElementById('summary').innerHTML = '';
@@ -423,11 +491,16 @@
     }
 
     function downloadCSV() {
-      if (!latestSchedule.length) { alert('請先產生班表'); return; }
-      let lines = ['日期,星期,類型,需求人數,上班人員,休假人員'];
+      if (!latestSchedule.length) {
+        alert('請先產生班表');
+        return;
+      }
+
+      let lines = ['日期,星期,類型,需要員工數,上班人員,休假人員'];
       latestSchedule.forEach(row => {
         lines.push(row.day + ',星期' + row.weekday + ',' + (row.holiday ? '假日' : '平日') + ',' + row.needPeople + ',"' + row.assigned.join('、') + '","' + row.off.join('、') + '"');
       });
+
       const blob = new Blob([String.fromCharCode(65279) + lines.join(String.fromCharCode(10))], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
