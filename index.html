@@ -97,12 +97,29 @@
 
     function parseDays(text, year, month) {
       if (!text.trim()) return [];
-      return text.split(',').map(x => x.trim()).filter(Boolean).map(x => {
-        if (x.includes('-')) {
+      let result = [];
+
+      text.split(',').map(x => x.trim()).filter(Boolean).forEach(x => {
+        if (x.includes('-') && !x.includes(':')) {
+          // 處理範圍 例如 21-25
+          const [start, end] = x.split('-').map(n => parseInt(n, 10));
+          if (Number.isFinite(start) && Number.isFinite(end) && start <= end) {
+            for (let d = start; d <= end; d++) result.push(d);
+          }
+        } else if (x.includes('-')) {
+          // 日期格式 2026-05-01
           const d = new Date(x);
-          if (d.getFullYear() === year && d.getMonth() + 1 === month) return d.getDate();
-          return null;
+          if (d.getFullYear() === year && d.getMonth() + 1 === month) {
+            result.push(d.getDate());
+          }
+        } else {
+          const n = parseInt(x, 10);
+          if (Number.isFinite(n)) result.push(n);
         }
+      });
+
+      return result;
+    }
         const n = parseInt(x, 10);
         return Number.isFinite(n) ? n : null;
       }).filter(x => x !== null);
