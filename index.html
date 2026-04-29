@@ -251,6 +251,8 @@
           if (offCountA !== offCountB) return offCountB - offCountA;
           if (a.consecutive >= 5 && b.consecutive < 5) return 1;
           if (b.consecutive >= 5 && a.consecutive < 5) return -1;
+          if (a.offDays && b.offDays && a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
+            return a.workDays - b.workDays;ays.length) return b.offDays.length - a.offDays.length;
           return a.workDays - b.workDays;
         });
 
@@ -300,6 +302,8 @@
           const offCount = staff.filter(e => e.offDays.includes(d)).length;
           if (a.workDays < 4 && b.workDays >= 4) return -1;
           if (b.workDays < 4 && a.workDays >= 4) return 1;
+          if (a.offDays && b.offDays && a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
+            return a.workDays - b.workDays;ays.length) return b.offDays.length - a.offDays.length;
           return a.workDays - b.workDays;
         });
 
@@ -379,7 +383,7 @@
 
       document.getElementById('scheduleTable').innerHTML = `
         <table>
-          <tr><th>日期</th><th>星期</th><th>人數</th><th>上班人員</th><th>休假人員</th></tr>
+          <tr><th>日期</th><th>星期</th><th>類型</th><th>需要員工數</th><th>上班人員</th><th>休假人員</th></tr>
           ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.needPeople} 人</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
         </table>
       `;
