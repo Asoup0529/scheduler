@@ -77,7 +77,7 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。若人數不足，系統會啟動自動補班，並在提醒區標示破例補班情況。</div>
+      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
@@ -200,8 +200,7 @@
         offDays: parseDays(emp.offText, year, month).filter(d => d <= daysInMonth),
         workDays: 0,
         consecutive: 0,
-        assignedDays: [],
-        forcedDays: []
+        assignedDays: []
       }));
 
       const fulltimers = staff.filter(e => e.type === 'fulltime');
@@ -233,12 +232,11 @@
           minPeople,
           maxPeople,
           assigned: [],
-          forced: [],
           off: staff.filter(e => e.offDays.includes(d)).map(e => e.name)
         });
       }
 
-      // 第一階段：先排正職，盡量讓每位正職剛好休指定天數
+      // 第一階段：先排正職，每個正職必須剛好上 daysInMonth - fulltimeOffDays 天
       for (let d = 1; d <= daysInMonth; d++) {
         const row = latestSchedule[d - 1];
         let availableFulltimers = fulltimers.filter(emp => {
@@ -248,6 +246,9 @@
         });
 
         availableFulltimers.sort((a, b) => {
+          const offCountA = fulltimers.filter(e => e.offDays.includes(d)).length;
+          const offCountB = offCountA;
+          if (offCountA !== offCountB) return offCountB - offCountA;
           if (a.consecutive >= 5 && b.consecutive < 5) return 1;
           if (b.consecutive >= 5 && a.consecutive < 5) return -1;
           return a.workDays - b.workDays;
@@ -268,7 +269,6 @@
         });
       }
 
-      // 第二階段：正職若還沒達到應上班天數，優先補進還沒滿人的日期
       fulltimers.forEach(emp => {
         if (emp.workDays < targetFulltimeWorkDays) {
           for (let d = 1; d <= daysInMonth && emp.workDays < targetFulltimeWorkDays; d++) {
@@ -282,7 +282,14 @@
         }
       });
 
-      // 第三階段：用工讀補足每天人數
+      fulltimers.forEach(emp => {
+        const actualOff = daysInMonth - emp.workDays;
+        if (actualOff !== fulltimeOffDays) {
+          warnings.push('正職 ' + emp.name + ' 本月休 ' + actualOff + ' 天，未剛好符合設定的 ' + fulltimeOffDays + ' 天。');
+        }
+      });
+
+      // 第二階段：正職排完後，再用工讀補足每天人數
       for (let d = 1; d <= daysInMonth; d++) {
         const row = latestSchedule[d - 1];
         const needToFill = row.needPeople - row.assigned.length;
@@ -290,6 +297,7 @@
 
         let availableParttimers = parttimers.filter(emp => !emp.offDays.includes(d));
         availableParttimers.sort((a, b) => {
+          const offCount = staff.filter(e => e.offDays.includes(d)).length;
           if (a.workDays < 4 && b.workDays >= 4) return -1;
           if (b.workDays < 4 && a.workDays >= 4) return 1;
           return a.workDays - b.workDays;
@@ -301,47 +309,11 @@
           emp.assignedDays.push(d);
           row.assigned.push(emp.name);
         });
-      }
 
-      // 第四階段：自動補班。若仍不足，先找沒有請假的人，再最後才允許破例補請假者。
-      for (let d = 1; d <= daysInMonth; d++) {
-        const row = latestSchedule[d - 1];
-        while (row.assigned.length < row.needPeople) {
-          let candidates = staff.filter(emp => !row.assigned.includes(emp.name) && !emp.offDays.includes(d));
-          let forcedReason = '一般補班';
-
-          if (candidates.length === 0) {
-            candidates = staff.filter(emp => !row.assigned.includes(emp.name));
-            forcedReason = '破例補班：原本這天有請假';
-          }
-
-          if (candidates.length === 0) {
-            warnings.push(month + '/' + d + ' 沒有任何員工可補班，仍然人數不足。');
-            break;
-          }
-
-          candidates.sort((a, b) => {
-            if (a.type === 'parttime' && b.type === 'fulltime') return -1;
-            if (b.type === 'parttime' && a.type === 'fulltime') return 1;
-            return a.workDays - b.workDays;
-          });
-
-          const emp = candidates[0];
-          emp.workDays++;
-          emp.assignedDays.push(d);
-          emp.forcedDays.push(d);
-          row.assigned.push(emp.name);
-          row.forced.push(emp.name + '（' + forcedReason + '）');
-          warnings.push(month + '/' + d + ' 自動補班：' + emp.name + '，' + forcedReason + '。');
+        if (row.assigned.length < row.minPeople) {
+          warnings.push(month + '/' + d + ' 人數不足，最少需要 ' + row.minPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
         }
       }
-
-      fulltimers.forEach(emp => {
-        const actualOff = daysInMonth - emp.workDays;
-        if (actualOff !== fulltimeOffDays) {
-          warnings.push('正職 ' + emp.name + ' 本月休 ' + actualOff + ' 天，未剛好符合設定的 ' + fulltimeOffDays + ' 天。');
-        }
-      });
 
       parttimers.forEach(emp => {
         if (emp.workDays < 4) {
