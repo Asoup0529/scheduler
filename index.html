@@ -77,7 +77,7 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
+      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。若假日人數不足，會優先從已排滿 4 人的平日移一位可上班員工去補假日，原平日保留至少 3 人。假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
@@ -314,6 +314,49 @@
           warnings.push(month + '/' + d + ' 人數不足，最少需要 ' + row.minPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
         }
       }
+
+      // 第三階段：假日若不足 5 人，從已排滿 4 人的平日移人過去補
+      latestSchedule.forEach(holidayRow => {
+        if (!holidayRow.holiday) return;
+
+        while (holidayRow.assigned.length < holidayRow.needPeople) {
+          let moved = false;
+
+          const sourceDays = latestSchedule.filter(row => {
+            return !row.holiday && row.maxPeople === 4 && row.assigned.length === 4 && row.assigned.length > row.minPeople;
+          });
+
+          for (const sourceRow of sourceDays) {
+            const candidateName = sourceRow.assigned.find(name => {
+              const emp = staff.find(e => e.name === name);
+              if (!emp) return false;
+              if (holidayRow.assigned.includes(name)) return false;
+              if (emp.offDays.includes(holidayRow.day)) return false;
+              return true;
+            });
+
+            if (candidateName) {
+              const emp = staff.find(e => e.name === candidateName);
+              sourceRow.assigned = sourceRow.assigned.filter(name => name !== candidateName);
+              holidayRow.assigned.push(candidateName);
+              emp.assignedDays = emp.assignedDays.filter(day => day !== sourceRow.day);
+              emp.assignedDays.push(holidayRow.day);
+              emp.assignedDays.sort((a, b) => a - b);
+              warnings.push(month + '/' + holidayRow.day + ' 假日人數不足，已從 ' + month + '/' + sourceRow.day + ' 平日移動 ' + candidateName + ' 補班。');
+              moved = true;
+              break;
+            }
+          }
+
+          if (!moved) break;
+        }
+      });
+
+      latestSchedule.forEach(row => {
+        if (row.assigned.length < row.minPeople) {
+          warnings.push(month + '/' + row.day + ' 人數不足，最少需要 ' + row.minPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
+        }
+      });
 
       parttimers.forEach(emp => {
         if (emp.workDays < 4) {
