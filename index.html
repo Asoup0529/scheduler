@@ -21,9 +21,6 @@
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
     .employee-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
     .employee-item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #f8fafc; }
-    .tag { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; color: white; margin-left: 6px; }
-    .fulltime { background: #2563eb; }
-    .parttime { background: #16a34a; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; background: white; }
     th, td { border: 1px solid #d1d5db; padding: 8px; text-align: center; vertical-align: top; }
     th { background: #e0ecff; }
@@ -52,7 +49,7 @@
       </div>
       <label>國定假日日期</label>
       <textarea id="nationalHolidays" placeholder="例如：1,10,25 或 2026-05-01,2026-05-25。週六日會自動視為假日。"></textarea>
-      <p class="small">國定假日可輸入日期數字，例如 1, 10, 25；也可輸入完整日期，例如 2026-05-01。</p>
+      <p class="small">可輸入：1,5,10-15。國定假日也支援完整日期，例如 2026-05-01。</p>
     </section>
 
     <section class="card input-area">
@@ -60,10 +57,10 @@
       <div class="grid">
         <div><label>員工姓名</label><input type="text" id="empName" placeholder="例如：小明" /></div>
         <div><label>員工類型</label><select id="empType"><option value="fulltime">正職</option><option value="parttime">工讀</option></select></div>
-        <div><label>想休日期</label><input type="text" id="empOff" placeholder="例如：1, 5, 12, 20" /></div>
+        <div><label>想休日期</label><input type="text" id="empOff" placeholder="例如：1,5,10-15,21-25" /></div>
       </div>
       <button onclick="addEmployee()">新增員工</button>
-      <p class="small">日期只要輸入幾號即可，用逗號隔開。</p>
+      <p class="small">日期可輸入單日、多日或範圍，例如：1,5,21-25。</p>
     </section>
 
     <section class="card input-area">
@@ -92,37 +89,39 @@
   <script>
     let employees = [];
     let latestSchedule = [];
+
     const today = new Date();
-    document.getElementById('monthInput').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    document.getElementById('monthInput').value = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+
+    function isNumberText(value) {
+      return value !== '' && !isNaN(Number(value));
+    }
 
     function parseDays(text, year, month) {
-      if (!text.trim()) return [];
-      let result = [];
+      if (!text || !text.trim()) return [];
+      const result = [];
+      const parts = text.split(',').map(item => item.trim()).filter(Boolean);
 
-      text.split(',').map(x => x.trim()).filter(Boolean).forEach(x => {
-        if (x.includes('-') && !x.includes(':')) {
-          // 處理範圍 例如 21-25
-          const [start, end] = x.split('-').map(n => parseInt(n, 10));
-          if (Number.isFinite(start) && Number.isFinite(end) && start <= end) {
+      parts.forEach(item => {
+        const dashParts = item.split('-').map(x => x.trim());
+
+        if (dashParts.length === 3 && dashParts.every(isNumberText)) {
+          const y = parseInt(dashParts[0], 10);
+          const m = parseInt(dashParts[1], 10);
+          const d = parseInt(dashParts[2], 10);
+          if (y === year && m === month) result.push(d);
+        } else if (dashParts.length === 2 && dashParts.every(isNumberText)) {
+          const start = parseInt(dashParts[0], 10);
+          const end = parseInt(dashParts[1], 10);
+          if (start <= end) {
             for (let d = start; d <= end; d++) result.push(d);
           }
-        } else if (x.includes('-')) {
-          // 日期格式 2026-05-01
-          const d = new Date(x);
-          if (d.getFullYear() === year && d.getMonth() + 1 === month) {
-            result.push(d.getDate());
-          }
-        } else {
-          const n = parseInt(x, 10);
-          if (Number.isFinite(n)) result.push(n);
+        } else if (isNumberText(item)) {
+          result.push(parseInt(item, 10));
         }
       });
 
-      return result;
-    }
-        const n = parseInt(x, 10);
-        return Number.isFinite(n) ? n : null;
-      }).filter(x => x !== null);
+      return Array.from(new Set(result)).filter(d => d >= 1 && d <= 31);
     }
 
     function addEmployee() {
@@ -130,75 +129,79 @@
       const type = document.getElementById('empType').value;
       const offDays = document.getElementById('empOff').value.trim();
       if (!name) { alert('請輸入員工姓名'); return; }
-      employees.push({ name, type, offText: offDays, workDays: 0, consecutive: 0 });
+      employees.push({ name, type, offText: offDays });
       document.getElementById('empName').value = '';
       document.getElementById('empOff').value = '';
       renderEmployees();
     }
 
-    function removeEmployee(index) { employees.splice(index, 1); renderEmployees(); }
+    function removeEmployee(index) {
+      employees.splice(index, 1);
+      renderEmployees();
+    }
+
+    function updateEmployee(index) {
+      const name = document.getElementById('editName' + index).value.trim();
+      const type = document.getElementById('editType' + index).value;
+      const offText = document.getElementById('editOff' + index).value.trim();
+      if (!name) { alert('員工姓名不能空白'); return; }
+      employees[index] = { name, type, offText };
+      renderEmployees();
+      alert('員工資料已更新');
+    }
 
     function renderEmployees() {
       const box = document.getElementById('employeeList');
-      if (employees.length === 0) { box.innerHTML = '<p class="small">尚未新增員工。</p>'; return; }
+      if (employees.length === 0) {
+        box.innerHTML = '<p class="small">尚未新增員工。</p>';
+        return;
+      }
+
       box.innerHTML = employees.map((emp, i) => `
         <div class="employee-item">
           <label>姓名</label>
           <input type="text" id="editName${i}" value="${emp.name}" />
-
           <label>員工類型</label>
           <select id="editType${i}">
             <option value="fulltime" ${emp.type === 'fulltime' ? 'selected' : ''}>正職</option>
             <option value="parttime" ${emp.type === 'parttime' ? 'selected' : ''}>工讀</option>
           </select>
-
           <label>想休日期</label>
-          <input type="text" id="editOff${i}" value="${emp.offText || ''}" placeholder="例如：1, 5, 12" />
-
+          <input type="text" id="editOff${i}" value="${emp.offText || ''}" placeholder="例如：1,5,21-25" />
           <button class="secondary" onclick="updateEmployee(${i})">儲存修改</button>
           <button class="danger" onclick="removeEmployee(${i})">刪除</button>
-        </div>`).join('');
-    }
-
-    function updateEmployee(index) {
-      const name = document.getElementById(`editName${index}`).value.trim();
-      const type = document.getElementById(`editType${index}`).value;
-      const offText = document.getElementById(`editOff${index}`).value.trim();
-
-      if (!name) {
-        alert('員工姓名不能空白');
-        return;
-      }
-
-      employees[index] = {
-        ...employees[index],
-        name,
-        type,
-        offText
-      };
-
-      renderEmployees();
-      alert('員工資料已更新');
+        </div>
+      `).join('');
     }
 
     function isHoliday(date, nationalHolidayDays) {
       const day = date.getDay();
-      const dateNumber = date.getDate();
-      return day === 0 || day === 6 || nationalHolidayDays.includes(dateNumber);
+      return day === 0 || day === 6 || nationalHolidayDays.includes(date.getDate());
     }
 
     function generateSchedule() {
       if (employees.length === 0) { alert('請先新增員工'); return; }
-      const [year, month] = document.getElementById('monthInput').value.split('-').map(Number);
+
+      const monthValue = document.getElementById('monthInput').value;
+      const ym = monthValue.split('-').map(Number);
+      const year = ym[0];
+      const month = ym[1];
       const daysInMonth = new Date(year, month, 0).getDate();
       const weekdayNeed = parseInt(document.getElementById('weekdayNeed').value, 10);
       const holidayNeed = parseInt(document.getElementById('holidayNeed').value, 10);
-      const nationalHolidayDays = parseDays(document.getElementById('nationalHolidays').value, year, month);
       const fulltimeOffDays = parseInt(document.getElementById('fulltimeOffDays').value, 10);
+      const nationalHolidayDays = parseDays(document.getElementById('nationalHolidays').value, year, month);
 
-      const staff = employees.map(emp => ({ ...emp, offDays: parseDays(emp.offText, year, month), workDays: 0, consecutive: 0, assignedDays: [] }));
+      const staff = employees.map(emp => ({
+        ...emp,
+        offDays: parseDays(emp.offText, year, month).filter(d => d <= daysInMonth),
+        workDays: 0,
+        consecutive: 0,
+        assignedDays: []
+      }));
+
       latestSchedule = [];
-      let warnings = [];
+      const warnings = [];
 
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month - 1, d);
@@ -214,43 +217,66 @@
           return a.workDays - b.workDays;
         });
 
-        let assigned = available.slice(0, needPeople);
-        if (assigned.length < needPeople) warnings.push(`${month}/${d} 可排人數不足，需要 ${needPeople} 人，但只排到 ${assigned.length} 人。`);
+        const assigned = available.slice(0, needPeople);
+        if (assigned.length < needPeople) warnings.push(month + '/' + d + ' 可排人數不足，需要 ' + needPeople + ' 人，但只排到 ' + assigned.length + ' 人。');
 
         staff.forEach(emp => {
-          if (assigned.includes(emp)) { emp.workDays++; emp.consecutive++; emp.assignedDays.push(d); }
-          else { emp.consecutive = 0; }
+          if (assigned.includes(emp)) {
+            emp.workDays++;
+            emp.consecutive++;
+            emp.assignedDays.push(d);
+          } else {
+            emp.consecutive = 0;
+          }
         });
 
-        latestSchedule.push({ day: d, weekday: ['日','一','二','三','四','五','六'][date.getDay()], holiday, needPeople, assigned: assigned.map(e => e.name), off: staff.filter(e => e.offDays.includes(d)).map(e => e.name) });
+        latestSchedule.push({
+          day: d,
+          weekday: ['日','一','二','三','四','五','六'][date.getDay()],
+          holiday,
+          needPeople,
+          assigned: assigned.map(e => e.name),
+          off: staff.filter(e => e.offDays.includes(d)).map(e => e.name)
+        });
       }
 
       staff.filter(e => e.type === 'fulltime').forEach(emp => {
         const actualOff = daysInMonth - emp.workDays;
-        if (actualOff !== fulltimeOffDays) warnings.push(`正職 ${emp.name} 本月休 ${actualOff} 天，未符合設定的 ${fulltimeOffDays} 天。`);
+        if (actualOff !== fulltimeOffDays) warnings.push('正職 ' + emp.name + ' 本月休 ' + actualOff + ' 天，未符合設定的 ' + fulltimeOffDays + ' 天。');
       });
+
       staff.filter(e => e.type === 'parttime').forEach(emp => {
-        if (emp.workDays < 4) warnings.push(`工讀 ${emp.name} 本月只排 ${emp.workDays} 天，少於 4 天。`);
+        if (emp.workDays < 4) warnings.push('工讀 ' + emp.name + ' 本月只排 ' + emp.workDays + ' 天，少於 4 天。');
       });
+
       renderSchedule(staff, warnings, year, month);
     }
 
     function renderSchedule(staff, warnings, year, month) {
       document.getElementById('summary').innerHTML = `
         <h3>${year} 年 ${month} 月員工統計</h3>
-        <table><tr><th>姓名</th><th>類型</th><th>上班天數</th><th>休假天數</th><th>指定休假</th></tr>
-        ${staff.map(emp => `<tr><td>${emp.name}</td><td>${emp.type === 'fulltime' ? '正職' : '工讀'}</td><td>${emp.workDays}</td><td>${latestSchedule.length - emp.workDays}</td><td>${emp.offText || '無'}</td></tr>`).join('')}</table>
-        ${warnings.length ? `<div class="note warning"><strong>提醒：</strong><br>${warnings.join('<br>')}</div>` : '<div class="note">排班完成，目前沒有明顯衝突。</div>'}`;
+        <table>
+          <tr><th>姓名</th><th>類型</th><th>上班天數</th><th>休假天數</th><th>指定休假</th></tr>
+          ${staff.map(emp => `<tr><td>${emp.name}</td><td>${emp.type === 'fulltime' ? '正職' : '工讀'}</td><td>${emp.workDays}</td><td>${latestSchedule.length - emp.workDays}</td><td>${emp.offText || '無'}</td></tr>`).join('')}
+        </table>
+        ${warnings.length ? `<div class="note warning"><strong>提醒：</strong><br>${warnings.join('<br>')}</div>` : '<div class="note">排班完成，目前沒有明顯衝突。</div>'}
+      `;
 
       document.getElementById('scheduleTable').innerHTML = `
-        <table><tr><th>日期</th><th>星期</th><th>類型</th><th>需求人數</th><th>上班人員</th><th>休假人員</th></tr>
-        ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.needPeople}</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}</table>`;
+        <table>
+          <tr><th>日期</th><th>星期</th><th>類型</th><th>需求人數</th><th>上班人員</th><th>休假人員</th></tr>
+          ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.needPeople}</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}
+        </table>
+      `;
     }
 
     function saveData() {
       localStorage.setItem('shiftEmployees', JSON.stringify(employees));
       localStorage.setItem('shiftMonth', document.getElementById('monthInput').value);
       localStorage.setItem('nationalHolidays', document.getElementById('nationalHolidays').value);
+      localStorage.setItem('weekdayNeed', document.getElementById('weekdayNeed').value);
+      localStorage.setItem('holidayNeed', document.getElementById('holidayNeed').value);
+      localStorage.setItem('fulltimeOffDays', document.getElementById('fulltimeOffDays').value);
       alert('已儲存到這台電腦的瀏覽器');
     }
 
@@ -258,6 +284,9 @@
       employees = JSON.parse(localStorage.getItem('shiftEmployees') || '[]');
       document.getElementById('monthInput').value = localStorage.getItem('shiftMonth') || document.getElementById('monthInput').value;
       document.getElementById('nationalHolidays').value = localStorage.getItem('nationalHolidays') || '';
+      document.getElementById('weekdayNeed').value = localStorage.getItem('weekdayNeed') || '4';
+      document.getElementById('holidayNeed').value = localStorage.getItem('holidayNeed') || '5';
+      document.getElementById('fulltimeOffDays').value = localStorage.getItem('fulltimeOffDays') || '8';
       renderEmployees();
     }
 
@@ -268,6 +297,9 @@
       localStorage.removeItem('shiftEmployees');
       localStorage.removeItem('shiftMonth');
       localStorage.removeItem('nationalHolidays');
+      localStorage.removeItem('weekdayNeed');
+      localStorage.removeItem('holidayNeed');
+      localStorage.removeItem('fulltimeOffDays');
       renderEmployees();
       document.getElementById('summary').innerHTML = '';
       document.getElementById('scheduleTable').innerHTML = '';
@@ -275,9 +307,11 @@
 
     function downloadCSV() {
       if (!latestSchedule.length) { alert('請先產生班表'); return; }
-      let csv = '日期,星期,類型,需求人數,上班人員,休假人員\n';
-      latestSchedule.forEach(row => { csv += `${row.day},星期${row.weekday},${row.holiday ? '假日' : '平日'},${row.needPeople},"${row.assigned.join('、')}","${row.off.join('、')}"\n`; });
-      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      let lines = ['日期,星期,類型,需求人數,上班人員,休假人員'];
+      latestSchedule.forEach(row => {
+        lines.push(row.day + ',星期' + row.weekday + ',' + (row.holiday ? '假日' : '平日') + ',' + row.needPeople + ',"' + row.assigned.join('、') + '","' + row.off.join('、') + '"');
+      });
+      const blob = new Blob([String.fromCharCode(65279) + lines.join(String.fromCharCode(10))], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
