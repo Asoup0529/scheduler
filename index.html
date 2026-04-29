@@ -48,7 +48,7 @@
         <div><label>選擇月份</label><input type="month" id="monthInput" /></div>
         <div><label>平日上班人數</label><input type="number" id="weekdayNeed" value="4" min="1" /></div>
         <div><label>假日上班人數</label><input type="number" id="holidayNeed" value="5" min="1" /></div>
-        <div><label>正職每月休假天數</label><select id="fulltimeOffDays"><option value="10">10 天</option><option value="11">11 天</option></select></div>
+        <div><label>正職每月休假天數</label><input type="number" id="fulltimeOffDays" value="8" min="0" /></div>
       </div>
       <label>國定假日日期</label>
       <textarea id="nationalHolidays" placeholder="例如：1,10,25 或 2026-05-01,2026-05-25。週六日會自動視為假日。"></textarea>
@@ -79,7 +79,7 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note">規則：平日排 4 人、假日排 5 人；假日包含週六、週日與手動輸入的國定假日。正職盡量避免連上 6 天；工讀每月至少排 4 天；員工指定休假日不排班。</div>
+      <div class="note">規則：平日排 4 人、假日排 5 人；假日包含週六、週日與手動輸入的國定假日。正職需達到指定休假天數，並盡量避免連上 6 天；工讀每月至少排 4 天；員工指定休假日不排班。</div>
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
@@ -145,6 +145,7 @@
       const weekdayNeed = parseInt(document.getElementById('weekdayNeed').value, 10);
       const holidayNeed = parseInt(document.getElementById('holidayNeed').value, 10);
       const nationalHolidayDays = parseDays(document.getElementById('nationalHolidays').value, year, month);
+      const fulltimeOffDays = parseInt(document.getElementById('fulltimeOffDays').value, 10);
 
       const staff = employees.map(emp => ({ ...emp, offDays: parseDays(emp.offText, year, month), workDays: 0, consecutive: 0, assignedDays: [] }));
       latestSchedule = [];
@@ -177,7 +178,7 @@
 
       staff.filter(e => e.type === 'fulltime').forEach(emp => {
         const actualOff = daysInMonth - emp.workDays;
-        if (actualOff < 10 || actualOff > 11) warnings.push(`正職 ${emp.name} 本月休 ${actualOff} 天，未符合 10-11 天。`);
+        if (actualOff !== fulltimeOffDays) warnings.push(`正職 ${emp.name} 本月休 ${actualOff} 天，未符合設定的 ${fulltimeOffDays} 天。`);
       });
       staff.filter(e => e.type === 'parttime').forEach(emp => {
         if (emp.workDays < 4) warnings.push(`工讀 ${emp.name} 本月只排 ${emp.workDays} 天，少於 4 天。`);
