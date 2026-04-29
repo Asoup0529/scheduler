@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>簡易排班系統</title>
+  <title>排班系統</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: Arial, "Microsoft JhengHei", sans-serif; margin: 0; background: #f4f6f8; color: #222; }
@@ -34,8 +34,7 @@
 </head>
 <body>
   <header>
-    <h1>簡易排班系統</h1>
-    <p>輸入員工、身分與休假日期，自動產生每月班表</p>
+    <h1>排班系統</h1>
   </header>
 
   <main>
@@ -77,7 +76,7 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。若假日人數不足，會優先從已排滿 4 人的平日移一位可上班員工去補假日，原平日保留至少 3 人。假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
+      <div class="note">規則：每個星期二只需要 2 位員工；其他平日最少 3 人、最多 4 人；假日固定 5 人。</di
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
