@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>簡易排班系統</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, "Microsoft JhengHei", sans-serif; margin: 0; background: #f4f6f8; color: #222; }
+    header { background: #2563eb; color: white; padding: 24px 16px; text-align: center; }
+    main { max-width: 1200px; margin: 24px auto; padding: 0 16px 40px; }
+    .card { background: white; border-radius: 14px; padding: 18px; margin-bottom: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+    h1, h2 { margin-top: 0; }
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, select, textarea, button { width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; }
+    textarea { min-height: 76px; resize: vertical; }
+    button { cursor: pointer; border: none; background: #2563eb; color: white; font-weight: bold; margin-top: 14px; }
+    button.secondary { background: #475569; }
+    button.danger { background: #dc2626; }
+    button:hover { opacity: .9; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .employee-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+    .employee-item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #f8fafc; }
+    .tag { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; color: white; margin-left: 6px; }
+    .fulltime { background: #2563eb; }
+    .parttime { background: #16a34a; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; background: white; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: center; vertical-align: top; }
+    th { background: #e0ecff; }
+    .holiday { background: #fee2e2; }
+    .note { background: #fff7ed; border-left: 5px solid #f97316; padding: 10px; border-radius: 8px; line-height: 1.6; }
+    .small { font-size: 13px; color: #555; }
+    .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .warning { color: #b91c1c; font-weight: bold; }
+    @media print { header, .input-area, .actions, .no-print { display: none; } body { background: white; } main { max-width: none; margin: 0; } .card { box-shadow: none; border: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>簡易排班系統</h1>
+    <p>輸入員工、身分與休假日期，自動產生每月班表</p>
+  </header>
+
+  <main>
+    <section class="card input-area">
+      <h2>1. 設定月份與人數規則</h2>
+      <div class="grid">
+        <div><label>選擇月份</label><input type="month" id="monthInput" /></div>
+        <div><label>平日上班人數</label><input type="number" id="weekdayNeed" value="4" min="1" /></div>
+        <div><label>假日上班人數</label><input type="number" id="holidayNeed" value="5" min="1" /></div>
+        <div><label>正職每月休假天數</label><select id="fulltimeOffDays"><option value="10">10 天</option><option value="11">11 天</option></select></div>
+      </div>
+      <label>國定假日日期</label>
+      <textarea id="nationalHolidays" placeholder="例如：1,10,25 或 2026-05-01,2026-05-25。週六日會自動視為假日。"></textarea>
+      <p class="small">國定假日可輸入日期數字，例如 1, 10, 25；也可輸入完整日期，例如 2026-05-01。</p>
+    </section>
+
+    <section class="card input-area">
+      <h2>2. 新增員工</h2>
+      <div class="grid">
+        <div><label>員工姓名</label><input type="text" id="empName" placeholder="例如：小明" /></div>
+        <div><label>員工類型</label><select id="empType"><option value="fulltime">正職</option><option value="parttime">工讀</option></select></div>
+        <div><label>想休日期</label><input type="text" id="empOff" placeholder="例如：1, 5, 12, 20" /></div>
+      </div>
+      <button onclick="addEmployee()">新增員工</button>
+      <p class="small">日期只要輸入幾號即可，用逗號隔開。</p>
+    </section>
+
+    <section class="card input-area">
+      <h2>3. 員工清單</h2>
+      <div id="employeeList" class="employee-list"></div>
+      <div class="actions">
+        <button onclick="generateSchedule()">產生班表</button>
+        <button class="secondary" onclick="saveData()">儲存資料到瀏覽器</button>
+        <button class="secondary" onclick="loadData()">讀取資料</button>
+        <button class="danger" onclick="clearAll()">清空資料</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. 排班結果</h2>
+      <div class="note">規則：平日排 4 人、假日排 5 人；假日包含週六、週日與手動輸入的國定假日。正職盡量避免連上 6 天；工讀每月至少排 4 天；員工指定休假日不排班。</div>
+      <div id="summary"></div>
+      <div class="actions no-print">
+        <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
+        <button class="secondary" onclick="downloadCSV()">下載 CSV</button>
+      </div>
+      <div id="scheduleTable"></div>
+    </section>
+  </main>
+
+  <script>
+    let employees = [];
+    let latestSchedule = [];
+    const today = new Date();
+    document.getElementById('monthInput').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+    function parseDays(text, year, month) {
+      if (!text.trim()) return [];
+      return text.split(',').map(x => x.trim()).filter(Boolean).map(x => {
+        if (x.includes('-')) {
+          const d = new Date(x);
+          if (d.getFullYear() === year && d.getMonth() + 1 === month) return d.getDate();
+          return null;
+        }
+        const n = parseInt(x, 10);
+        return Number.isFinite(n) ? n : null;
+      }).filter(x => x !== null);
+    }
+
+    function addEmployee() {
+      const name = document.getElementById('empName').value.trim();
+      const type = document.getElementById('empType').value;
+      const offDays = document.getElementById('empOff').value.trim();
+      if (!name) { alert('請輸入員工姓名'); return; }
+      employees.push({ name, type, offText: offDays, workDays: 0, consecutive: 0 });
+      document.getElementById('empName').value = '';
+      document.getElementById('empOff').value = '';
+      renderEmployees();
+    }
+
+    function removeEmployee(index) { employees.splice(index, 1); renderEmployees(); }
+
+    function renderEmployees() {
+      const box = document.getElementById('employeeList');
+      if (employees.length === 0) { box.innerHTML = '<p class="small">尚未新增員工。</p>'; return; }
+      box.innerHTML = employees.map((emp, i) => `
+        <div class="employee-item">
+          <strong>${emp.name}</strong><span class="tag ${emp.type}">${emp.type === 'fulltime' ? '正職' : '工讀'}</span>
+          <p>想休：${emp.offText || '無'}</p>
+          <button class="danger" onclick="removeEmployee(${i})">刪除</button>
+        </div>`).join('');
+    }
+
+    function isHoliday(date, nationalHolidayDays) {
+      const day = date.getDay();
+      const dateNumber = date.getDate();
+      return day === 0 || day === 6 || nationalHolidayDays.includes(dateNumber);
+    }
+
+    function generateSchedule() {
+      if (employees.length === 0) { alert('請先新增員工'); return; }
+      const [year, month] = document.getElementById('monthInput').value.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const weekdayNeed = parseInt(document.getElementById('weekdayNeed').value, 10);
+      const holidayNeed = parseInt(document.getElementById('holidayNeed').value, 10);
+      const nationalHolidayDays = parseDays(document.getElementById('nationalHolidays').value, year, month);
+
+      const staff = employees.map(emp => ({ ...emp, offDays: parseDays(emp.offText, year, month), workDays: 0, consecutive: 0, assignedDays: [] }));
+      latestSchedule = [];
+      let warnings = [];
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month - 1, d);
+        const holiday = isHoliday(date, nationalHolidayDays);
+        const needPeople = holiday ? holidayNeed : weekdayNeed;
+        let available = staff.filter(emp => !emp.offDays.includes(d));
+
+        available.sort((a, b) => {
+          if (a.type === 'parttime' && a.workDays < 4 && !(b.type === 'parttime' && b.workDays < 4)) return -1;
+          if (b.type === 'parttime' && b.workDays < 4 && !(a.type === 'parttime' && a.workDays < 4)) return 1;
+          if (a.type === 'fulltime' && a.consecutive >= 5 && b.consecutive < 5) return 1;
+          if (b.type === 'fulltime' && b.consecutive >= 5 && a.consecutive < 5) return -1;
+          return a.workDays - b.workDays;
+        });
+
+        let assigned = available.slice(0, needPeople);
+        if (assigned.length < needPeople) warnings.push(`${month}/${d} 可排人數不足，需要 ${needPeople} 人，但只排到 ${assigned.length} 人。`);
+
+        staff.forEach(emp => {
+          if (assigned.includes(emp)) { emp.workDays++; emp.consecutive++; emp.assignedDays.push(d); }
+          else { emp.consecutive = 0; }
+        });
+
+        latestSchedule.push({ day: d, weekday: ['日','一','二','三','四','五','六'][date.getDay()], holiday, needPeople, assigned: assigned.map(e => e.name), off: staff.filter(e => e.offDays.includes(d)).map(e => e.name) });
+      }
+
+      staff.filter(e => e.type === 'fulltime').forEach(emp => {
+        const actualOff = daysInMonth - emp.workDays;
+        if (actualOff < 10 || actualOff > 11) warnings.push(`正職 ${emp.name} 本月休 ${actualOff} 天，未符合 10-11 天。`);
+      });
+      staff.filter(e => e.type === 'parttime').forEach(emp => {
+        if (emp.workDays < 4) warnings.push(`工讀 ${emp.name} 本月只排 ${emp.workDays} 天，少於 4 天。`);
+      });
+      renderSchedule(staff, warnings, year, month);
+    }
+
+    function renderSchedule(staff, warnings, year, month) {
+      document.getElementById('summary').innerHTML = `
+        <h3>${year} 年 ${month} 月員工統計</h3>
+        <table><tr><th>姓名</th><th>類型</th><th>上班天數</th><th>休假天數</th><th>指定休假</th></tr>
+        ${staff.map(emp => `<tr><td>${emp.name}</td><td>${emp.type === 'fulltime' ? '正職' : '工讀'}</td><td>${emp.workDays}</td><td>${latestSchedule.length - emp.workDays}</td><td>${emp.offText || '無'}</td></tr>`).join('')}</table>
+        ${warnings.length ? `<div class="note warning"><strong>提醒：</strong><br>${warnings.join('<br>')}</div>` : '<div class="note">排班完成，目前沒有明顯衝突。</div>'}`;
+
+      document.getElementById('scheduleTable').innerHTML = `
+        <table><tr><th>日期</th><th>星期</th><th>類型</th><th>需求人數</th><th>上班人員</th><th>休假人員</th></tr>
+        ${latestSchedule.map(row => `<tr class="${row.holiday ? 'holiday' : ''}"><td>${month}/${row.day}</td><td>${row.weekday}</td><td>${row.holiday ? '假日' : '平日'}</td><td>${row.needPeople}</td><td>${row.assigned.join('、') || '無'}</td><td>${row.off.join('、') || '無'}</td></tr>`).join('')}</table>`;
+    }
+
+    function saveData() {
+      localStorage.setItem('shiftEmployees', JSON.stringify(employees));
+      localStorage.setItem('shiftMonth', document.getElementById('monthInput').value);
+      localStorage.setItem('nationalHolidays', document.getElementById('nationalHolidays').value);
+      alert('已儲存到這台電腦的瀏覽器');
+    }
+
+    function loadData() {
+      employees = JSON.parse(localStorage.getItem('shiftEmployees') || '[]');
+      document.getElementById('monthInput').value = localStorage.getItem('shiftMonth') || document.getElementById('monthInput').value;
+      document.getElementById('nationalHolidays').value = localStorage.getItem('nationalHolidays') || '';
+      renderEmployees();
+    }
+
+    function clearAll() {
+      if (!confirm('確定要清空所有員工資料嗎？')) return;
+      employees = [];
+      latestSchedule = [];
+      localStorage.removeItem('shiftEmployees');
+      localStorage.removeItem('shiftMonth');
+      localStorage.removeItem('nationalHolidays');
+      renderEmployees();
+      document.getElementById('summary').innerHTML = '';
+      document.getElementById('scheduleTable').innerHTML = '';
+    }
+
+    function downloadCSV() {
+      if (!latestSchedule.length) { alert('請先產生班表'); return; }
+      let csv = '日期,星期,類型,需求人數,上班人員,休假人員\n';
+      latestSchedule.forEach(row => { csv += `${row.day},星期${row.weekday},${row.holiday ? '假日' : '平日'},${row.needPeople},"${row.assigned.join('、')}","${row.off.join('、')}"\n`; });
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '班表.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    renderEmployees();
+  </script>
+</body>
+</html>
