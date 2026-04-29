@@ -388,7 +388,31 @@
         }
       });
 
-      // 第五階段：最後檢查
+      // 第五階段：若補班後還有空缺，再從當天可以上班的工讀補，不違反休假日
+      latestSchedule.forEach(row => {
+        while (row.assigned.length < row.needPeople) {
+          const availableParttimers = parttimers
+            .filter(emp => !row.assigned.includes(emp.name))
+            .filter(emp => !emp.offDays.includes(row.day))
+            .sort((a, b) => {
+              if (a.workDays < 4 && b.workDays >= 4) return -1;
+              if (b.workDays < 4 && a.workDays >= 4) return 1;
+              if (a.offDays.length !== b.offDays.length) return b.offDays.length - a.offDays.length;
+              return a.workDays - b.workDays;
+            });
+
+          if (availableParttimers.length === 0) break;
+
+          const emp = availableParttimers[0];
+          emp.workDays++;
+          emp.assignedDays.push(row.day);
+          emp.assignedDays.sort((a, b) => a - b);
+          row.assigned.push(emp.name);
+          warnings.push(month + '/' + row.day + ' 仍有空缺，已由可上班工讀 ' + emp.name + ' 補班。');
+        }
+      });
+
+      // 第六階段：最後檢查
       latestSchedule.forEach(row => {
         if (row.assigned.length < row.needPeople) {
           warnings.push(month + '/' + row.day + ' 人數不足，需要 ' + row.needPeople + ' 人，但只排到 ' + row.assigned.length + ' 人。');
