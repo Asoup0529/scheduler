@@ -76,7 +76,7 @@
 
     <section class="card">
       <h2>4. 排班結果</h2>
-      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。平日排 4 人、假日排 5 人；假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
+      <div class="note">規則：正職絕對要剛好休到指定天數，先排正職，再用工讀補足每日人數。每個星期二只需要 2 位員工；其他平日排 4 人、假日排 5 人；假日包含週六、週日與手動輸入的國定假日。工讀每月至少排 4 天；員工指定休假日不排班。</div>
       <div id="summary"></div>
       <div class="actions no-print">
         <button class="secondary" onclick="window.print()">列印 / 另存 PDF</button>
@@ -216,7 +216,8 @@
       for (let d = 1; d <= daysInMonth; d++) {
         const date = new Date(year, month - 1, d);
         const holiday = isHoliday(date, nationalHolidayDays);
-        const needPeople = holiday ? holidayNeed : weekdayNeed;
+        const isTuesday = date.getDay() === 2;
+        const needPeople = isTuesday ? 2 : (holiday ? holidayNeed : weekdayNeed);
 
         latestSchedule.push({
           day: d,
